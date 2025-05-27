@@ -35,6 +35,7 @@ app.add_middleware(
 app.include_router(user_router, prefix="/users")
 app.include_router(diary_router, prefix="/diarys")
 app.include_router(oauth_router, prefix="/users")
+app.include_router(oauth_router, prefix="/users")
 
 
 if __name__ == "__main__":

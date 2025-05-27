@@ -9,6 +9,8 @@ from models.users import User, UserSignIn, UserSignUp
 from utils.oauth import oauth
 from fastapi.responses import Response
 from auth.authenticate import authenticate
+from fastapi.responses import Response
+from auth.authenticate import authenticate
 import os
 import logging
 
@@ -34,7 +36,8 @@ async def sign_new_user(data: UserSignUp, session = Depends(get_session)) -> dic
     new_user = User(
         email=data.email,
         password=hash_password.hash_password(data.password),
-        username=data.username,
+        username=data.username, 
+        hobby=data.hobby,
         role=data.role,
         diarys=[]
     )
@@ -68,22 +71,29 @@ async def sign_in(
     
     access_token = create_jwt_token(user.email, user.id)
 
-    # 토큰을 HTTPOnly 쿠키에 저장
+    # ✅ 쿠키에 JWT 저장
+    response = Response(content="로그인에 성공했습니다.")
     response.set_cookie(
         key="access_token",
         value=access_token,
-        httponly=True,       # JS에서 접근 불가 (XSS 방지)
-        secure=False,        # True면 HTTPS에서만 쿠키 전송됨 (배포시 True 권장)
-        samesite="lax",      # 또는 'strict' (상황에 맞게)
-        max_age=60*60*24,    # 1일 (단위: 초)
-        path="/"
+        httponly=True,
+        max_age=60 * 60 * 24,  # 1일
+        samesite="lax",
+        secure=False  # HTTPS 환경에서는 True로 바꾸세요
     )
 
-    return {
-        "message": "로그인에 성공했습니다.",
-        "username": user.username
-        # "access_token": access_token  # 이 줄은 이제 제거해도 됨
-    }
+    return response
+
+#로그아웃 쿠키 제거
+@user_router.post("/logout")
+async def logout():
+    response = JSONResponse(content={"message": "로그아웃 완료"})
+    response.delete_cookie(
+        key="access_token",
+        path="/",          # ✅ 쿠키 설정했던 path와 동일하게!
+        samesite="lax"     # 쿠키 설정과 동일해야 확실히 삭제됨
+    )
+    return response
     # return JSONResponse(    
     #     status_code=status.HTTP_200_OK,
     #     content={
@@ -93,21 +103,7 @@ async def sign_in(
     #     }
     # )
 
+
 @user_router.get("/me")
-async def get_login_status(user=Depends(authenticate)):
-    return {
-        "message": "로그인 상태입니다.",
-        "user": user
-    }
-
-
-@user_router.post("/logout")
-async def logout(response: Response):
-    # access_token 쿠키를 삭제
-    response.delete_cookie(
-        key="access_token",
-        path="/"
-    )
-    return {
-        "message": "로그아웃 되었습니다."
-    }
+async def get_current_user(user_id: int = Depends(authenticate)):
+    return {"user_id": user_id}
